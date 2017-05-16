@@ -21,13 +21,22 @@ public class ReactionDiffusion : MonoBehaviour {
     public float f = 0.055f;
     [Range(0, 0.1f)]
     public float k = 0.062f;
-    public float speed = 1;
+    public int speed = 1;
 
     public int seedSize = 10;
     public int seedNum = 10;
 
+    // Albedo
     public Color topColor = Color.white;
     public Color bottomColor = Color.black;
+
+    // Emittion
+    public Color topEmit = Color.black;
+    public Color bottomEmit = Color.black;
+    [Range(0,10)]
+    public float topEmitIntensity = 0;
+    [Range(0, 10)]
+    public float bottomEmitIntensity = 0;
 
     public ComputeShader cs;
 
@@ -114,6 +123,10 @@ public class ReactionDiffusion : MonoBehaviour {
                 r.material.SetTexture("_MainTex", heightMapTexture);
                 r.material.SetColor("_Color0", bottomColor);
                 r.material.SetColor("_Color1", topColor);
+                r.material.SetColor("_Emit0", bottomEmit);
+                r.material.SetColor("_Emit1", topEmit);
+                r.material.SetFloat("_EmitInt0", bottomEmitIntensity);
+                r.material.SetFloat("_EmitInt1", topEmitIntensity);
             }
         }
     }
@@ -151,6 +164,10 @@ public class ReactionDiffusion : MonoBehaviour {
             rendererList[i].material.SetTexture("_MainTex", heightMapTexture);
             rendererList[i].material.SetColor("_Color0", bottomColor);
             rendererList[i].material.SetColor("_Color1", topColor);
+            rendererList[i].material.SetColor("_Emit0", bottomEmit);
+            rendererList[i].material.SetColor("_Emit1", topEmit);
+            rendererList[i].material.SetFloat("_EmitInt0", bottomEmitIntensity);
+            rendererList[i].material.SetFloat("_EmitInt1", topEmitIntensity);
         }
     }
 

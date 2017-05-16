@@ -5,6 +5,11 @@
 		_Color0("Color 0", Color) = (1,1,1,1)
 		_Color1("Color 1", Color) = (1,1,1,1)
 		[Space]
+		_Emit0("EmitColor 0", Color) = (1,1,1,1)
+		_Emit1("EmitColor 1", Color) = (1,1,1,1)
+		_EmitInt0("Emit Intensity 0", Range(0, 1)) = 0
+		_EmitInt1("Emit Intensity 1", Range(0, 1)) = 0
+		[Space]
 		_Smoothness0("Smoothness 0", Range(0, 1)) = 0.5
 		_Smoothness1("Smoothness 1", Range(0, 1)) = 0.5
 		[Space]
@@ -36,10 +41,12 @@
 		};
 
 		fixed4 _Color0, _Color1;
+		fixed4 _Emit0, _Emit1;
 		half _Smoothness0, _Smoothness1;
 		half _Metallic0, _Metallic1;
 		half _Threshold, _Fading;
 		half _NormalStrength;
+		half _EmitInt0, _EmitInt1;
 
 		void surf (Input IN, inout SurfaceOutputStandard o) {
 			float3 duv = float3(_MainTex_TexelSize.xy, 0);
@@ -60,6 +67,7 @@
 			o.Smoothness = lerp(_Smoothness0, _Smoothness1, p);
 			o.Metallic = lerp(_Metallic0, _Metallic1, p);
 			o.Normal = normalize(float3(v1 - v2, v3 - v4, 1 - _NormalStrength));
+			o.Emission = lerp(_Emit0 * _EmitInt0, _Emit1 * _EmitInt1, p).rgb;
 		}
 		ENDCG
 	}
