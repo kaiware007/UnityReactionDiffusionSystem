@@ -1,0 +1,166 @@
+﻿//#pragma kernel Init
+#pragma kernel Update
+#pragma kernel Draw
+
+#define THREAD_NUM_X 32
+
+struct RDData
+{
+	float a;
+	float b;
+};
+
+int _TexWidth;
+int _TexHeight;
+float _DA;
+float _DB;
+float _Feed;
+float _K;
+float _DT;
+
+float4 _TopColor;
+float4 _BottomColor;
+
+StructuredBuffer<RDData> _BufferRead;
+RWStructuredBuffer<RDData> _BufferWrite;
+
+RWTexture2D<float4> _DistTex;	// 書き込み先テクスチャ
+RWTexture2D<float4> _HeightMap;	// ハイトマップ
+RWTexture2D<float4> _NormalMap;	// ノーマルマップ
+
+int GetIndex(int x, int y) {
+	x = (x < 0) ? x + _TexWidth : x;
+	x = (x >= _TexWidth) ? x - _TexWidth : x;
+
+	y = (y < 0) ? y + _TexHeight : y;
+	y = (y >= _TexHeight) ? y - _TexHeight : y;
+
+	return y * _TexWidth + x;
+}
+
+int2 GetPosition(int idx) {
+	int2 pos;
+	pos.x = idx % _TexWidth;
+	pos.y = idx / _TexWidth;
+	return pos;
+}
+
+float LaplaceA(int x, int y) {
+	float sumA = 0;
+	
+	sumA += _BufferRead[GetIndex(x, y)].a * -1;
+
+	sumA += _BufferRead[GetIndex(x - 1, y)].a * 0.2;
+	sumA += _BufferRead[GetIndex(x + 1, y)].a * 0.2;
+	sumA += _BufferRead[GetIndex(x, y - 1)].a * 0.2;
+	sumA += _BufferRead[GetIndex(x, y + 1)].a * 0.2;
+
+	sumA += _BufferRead[GetIndex(x - 1, y - 1)].a * 0.05;
+	sumA += _BufferRead[GetIndex(x + 1, y - 1)].a * 0.05;
+	sumA += _BufferRead[GetIndex(x + 1, y + 1)].a * 0.05;
+	sumA += _BufferRead[GetIndex(x - 1, y + 1)].a * 0.05;
+
+	return sumA;
+}
+
+float LaplaceB(int x, int y) {
+	float sumB = 0;
+
+	sumB += _BufferRead[GetIndex(x, y)].b * -1;
+
+	sumB += _BufferRead[GetIndex(x - 1, y)].b * 0.2;
+	sumB += _BufferRead[GetIndex(x + 1, y)].b * 0.2;
+	sumB += _BufferRead[GetIndex(x, y - 1)].b * 0.2;
+	sumB += _BufferRead[GetIndex(x, y + 1)].b * 0.2;
+
+	sumB += _BufferRead[GetIndex(x - 1, y - 1)].b * 0.05;
+	sumB += _BufferRead[GetIndex(x + 1, y - 1)].b * 0.05;
+	sumB += _BufferRead[GetIndex(x + 1, y + 1)].b * 0.05;
+	sumB += _BufferRead[GetIndex(x - 1, y + 1)].b * 0.05;
+
+	return sumB;
+}
+
+float GetValue(int x, int y) {
+	int idx = GetIndex(x, y);
+	float a = _BufferRead[idx].a;
+	float b = _BufferRead[idx].b;
+	return 1 - clamp(a - b, 0, 1);
+}
+
+float3 GetNormal(int x, int y) {
+	float3 normal = float3(0, 0, 0);
+	float c = GetValue(x, y);
+	normal.x = ((GetValue(x - 1, y) - c) - (GetValue(x + 1, y) - c));
+	normal.y = ((GetValue(x, y - 1) - c) - (GetValue(x, y + 1) - c));
+	normal.z = 1;
+	normal = normalize(normal) * 0.5 + 0.5;
+	return normal;
+}
+
+float3 HSV2RGB(float3 HSV)
+{
+	float4 k = float4(1.0, 2.0 / 3.0, 1.0 / 3.0, 3.0);
+	float3 p = abs(frac(HSV.xxx + k.xyz) * 6.0 - k.www);
+	return HSV.z * lerp(k.xxx, clamp(p - k.xxx, 0.0, 1.0), HSV.y);
+}
+
+//[numthreads(THREAD_NUM_X, 1,1)]
+//void Init (uint id : SV_DispatchThreadID)
+//{
+//	int2 pos = GetPosition(id);
+//	_BufferWrite[id].a = 0;
+//	_BufferWrite[id].b = 0;
+//}
+//
+//[numthreads(THREAD_NUM_X, 1, 1)]
+//void Init2(uint id : SV_DispatchThreadID)
+//{
+//	int2 pos = GetPosition(id);
+//	if ((pos.x > 100) && (pos.x < 210) && (pos.y > 100) && (pos.y < 210)) {
+//		_BufferWrite[id].a = 1;
+//		_BufferWrite[id].b = 1;
+//	}
+//	else {
+//		_BufferWrite[id].a = 0;
+//		_BufferWrite[id].b = 0;
+//	}
+//}
+
+[numthreads(THREAD_NUM_X, THREAD_NUM_X, 1)]
+void Update(uint3 id : SV_DispatchThreadID)
+{
+	// 端っこは何もしない
+	//if ((id.x == 0) || (id.x == (_TexWidth - 1))) return;
+	//if ((id.y == 0) || (id.y == (_TexHeight - 1))) return;
+
+	int idx = GetIndex(id.x, id.y);
+	float a = _BufferRead[idx].a;
+	float b = _BufferRead[idx].b;
+	float abb = a * b * b;
+	_BufferWrite[idx].a = clamp(a + (_DA * LaplaceA(id.x, id.y) - abb + _Feed * (1.0 - a)), 0, 1);
+	_BufferWrite[idx].b = clamp(b + (_DB * LaplaceB(id.x, id.y) + abb - (_K + _Feed) * b), 0, 1);
+
+}
+
+[numthreads(THREAD_NUM_X, THREAD_NUM_X, 1)]
+void Draw(uint3 id : SV_DispatchThreadID)
+{
+	//int idx = GetIndex(id.x, id.y);
+	//float a = _BufferRead[idx].a;
+	//float b = _BufferRead[idx].b;
+	//float c = 1 - clamp(a - b, 0, 1);
+	float c = GetValue(id.x, id.y);
+
+	// Color
+	//_DistTex[id.xy] = float4(HSV2RGB(float3(c, 1, 1)), 1);
+	_DistTex[id.xy] = lerp(_BottomColor, _TopColor, c) * 4;
+
+	// height map
+	_HeightMap[id.xy] = float4(c, c, c, c);
+	//_DistTex[id.xy] = float4(c, a, b, 1);
+
+	// normal map
+	_NormalMap[id.xy] = float4(GetNormal(id.x, id.y), 1);
+
+}
