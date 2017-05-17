@@ -21,6 +21,7 @@ public class ReactionDiffusion : MonoBehaviour {
     public float f = 0.055f;
     [Range(0, 0.1f)]
     public float k = 0.062f;
+    [Range(0, 32)]
     public int speed = 1;
 
     public int seedSize = 10;
@@ -121,6 +122,7 @@ public class ReactionDiffusion : MonoBehaviour {
             {
                 rendererList.Add(r);
                 r.material.SetTexture("_MainTex", heightMapTexture);
+                r.material.SetTexture("_DispTex", heightMapTexture);
                 r.material.SetColor("_Color0", bottomColor);
                 r.material.SetColor("_Color1", topColor);
                 r.material.SetColor("_Emit0", bottomEmit);
@@ -162,6 +164,7 @@ public class ReactionDiffusion : MonoBehaviour {
         for (int i = 0; i < rendererList.Count; i++)
         {
             rendererList[i].material.SetTexture("_MainTex", heightMapTexture);
+            rendererList[i].material.SetTexture("_DispTex", heightMapTexture);
             rendererList[i].material.SetColor("_Color0", bottomColor);
             rendererList[i].material.SetColor("_Color1", topColor);
             rendererList[i].material.SetColor("_Emit0", bottomEmit);

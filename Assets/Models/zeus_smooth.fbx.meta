@@ -1,25 +1,15 @@
 fileFormatVersion: 2
-guid: 441037bba6de1df428d13b5f5ed00631
-timeCreated: 1494936322
+guid: e02e9338fbf20c548a1fbeb7338dd54d
+timeCreated: 1494994855
 licenseType: Pro
 ModelImporter:
   serializedVersion: 19
   fileIDToRecycleName:
     100000: //RootNode
-    100002: zeus-2_MeshPart0
-    100004: zeus-2_MeshPart1
     400000: //RootNode
-    400002: zeus-2_MeshPart0
-    400004: zeus-2_MeshPart1
-    2300000: zeus-2_MeshPart0
-    2300002: zeus-2_MeshPart1
-    2300004: //RootNode
-    3300000: zeus-2_MeshPart0
-    3300002: zeus-2_MeshPart1
-    3300004: //RootNode
-    4300000: zeus-2_MeshPart0
-    4300002: zeus-2_MeshPart1
-    4300004: zeus-2
+    2300000: //RootNode
+    3300000: //RootNode
+    4300000: zeus-2
   materials:
     importMaterials: 0
     materialName: 0
@@ -63,8 +53,8 @@ ModelImporter:
     useFileScale: 1
   tangentSpace:
     normalSmoothAngle: 60
-    normalImportMode: 0
-    tangentImportMode: 0
+    normalImportMode: 1
+    tangentImportMode: 3
   importAnimation: 1
   copyAvatar: 0
   humanDescription:
