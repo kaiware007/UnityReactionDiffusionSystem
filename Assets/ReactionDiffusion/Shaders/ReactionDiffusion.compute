@@ -1,6 +1,7 @@
 ﻿//#pragma kernel Init
 #pragma kernel Update
 #pragma kernel Draw
+#pragma kernel AddSeed
 
 #define THREAD_NUM_X 32
 
@@ -21,8 +22,12 @@ float _DT;
 float4 _TopColor;
 float4 _BottomColor;
 
+int _SeedSize;
+int _InputNum;
+
 StructuredBuffer<RDData> _BufferRead;
 RWStructuredBuffer<RDData> _BufferWrite;
+StructuredBuffer<float2> _InputBufferRead;
 
 RWTexture2D<float4> _DistTex;	// 書き込み先テクスチャ
 RWTexture2D<float4> _HeightMap;	// ハイトマップ
@@ -127,6 +132,7 @@ float3 HSV2RGB(float3 HSV)
 //	}
 //}
 
+// 更新処理
 [numthreads(THREAD_NUM_X, THREAD_NUM_X, 1)]
 void Update(uint3 id : SV_DispatchThreadID)
 {
@@ -143,6 +149,7 @@ void Update(uint3 id : SV_DispatchThreadID)
 
 }
 
+// テクスチャに描画
 [numthreads(THREAD_NUM_X, THREAD_NUM_X, 1)]
 void Draw(uint3 id : SV_DispatchThreadID)
 {
@@ -163,4 +170,31 @@ void Draw(uint3 id : SV_DispatchThreadID)
 	// normal map
 	_NormalMap[id.xy] = float4(GetNormal(id.x, id.y), 1);
 
+}
+
+// シードの追加
+[numthreads(THREAD_NUM_X, 1, 1)]
+void AddSeed(uint id : SV_DispatchThreadID)
+{
+	if (_InputNum <= id) return;
+
+	int w = _SeedSize;
+	int h = _SeedSize;
+	float radius = _SeedSize * 0.5;
+
+	int centerX = _InputBufferRead[id].x;
+	int centerY = _InputBufferRead[id].y;
+	int startX = _InputBufferRead[id].x - w / 2;
+	int startY = _InputBufferRead[id].y - h / 2;
+	for (int x = 0; x < w; x++)
+	{
+		for (int y = 0; y < h; y++)
+		{
+			float dis = distance(float2(centerX, centerY), float2(startX + x, startY + y));
+			if (dis <= radius) {
+				_BufferWrite[GetIndex((centerX + x), (centerY + y))].b = 1;
+			}
+		}
+	}
+	
 }

@@ -39,6 +39,8 @@ public class ReactionDiffusion : MonoBehaviour {
     [Range(0, 10)]
     public float bottomEmitIntensity = 0;
 
+    public int inputMax = 32;
+
     public ComputeShader cs;
 
     public RenderTexture colorTexture;
@@ -47,12 +49,16 @@ public class ReactionDiffusion : MonoBehaviour {
 
     private int kernelUpdate = -1;
     private int kernelDraw = -1;
+    private int kernelAddSeed = -1;
 
     private ComputeBuffer[] buffers;
+    private ComputeBuffer inputBuffer;
     private RDData[] bufData;
     private RDData[] bufData2;
+    private Vector2[] inputData;
+    private int inputIndex = 0;
     private List<Renderer> rendererList = new List<Renderer>();
-
+    
     void ResetBuffer()
     {
         for (int x = 0; x < texWidth; x++)
@@ -69,22 +75,22 @@ public class ReactionDiffusion : MonoBehaviour {
             }
         }
 
-        // ランダム
-        int w = seedSize;
-        int h = seedSize;
-        for (int i = 0; i < seedNum; i++)
-        {
-            int centerX = Random.Range(seedSize, texWidth - seedSize) - w / 2;
-            int centerY = Random.Range(seedSize, texHeight - seedSize) - h / 2;
-            for (int x = 0; x < w; x++)
-            {
-                for (int y = 0; y < h; y++)
-                {
-                    int idx = (centerX + x) + (centerY + y) * texWidth;
-                    bufData[idx].b = 1;
-                }
-            }
-        }
+        //// ランダム
+        //int w = seedSize;
+        //int h = seedSize;
+        //for (int i = 0; i < seedNum; i++)
+        //{
+        //    int centerX = Random.Range(seedSize, texWidth - seedSize) - w / 2;
+        //    int centerY = Random.Range(seedSize, texHeight - seedSize) - h / 2;
+        //    for (int x = 0; x < w; x++)
+        //    {
+        //        for (int y = 0; y < h; y++)
+        //        {
+        //            int idx = (centerX + x) + (centerY + y) * texWidth;
+        //            bufData[idx].b = 1;
+        //        }
+        //    }
+        //}
 
         buffers[0].SetData(bufData);
         buffers[1].SetData(bufData2);
@@ -94,6 +100,7 @@ public class ReactionDiffusion : MonoBehaviour {
     {
         kernelUpdate = cs.FindKernel("Update");
         kernelDraw = cs.FindKernel("Draw");
+        kernelAddSeed = cs.FindKernel("AddSeed");
 
         colorTexture = CreateTexture(texWidth, texHeight);
         heightMapTexture = CreateTexture(texWidth, texHeight);
@@ -114,6 +121,10 @@ public class ReactionDiffusion : MonoBehaviour {
         bufData2 = new RDData[texWidth * texHeight];
 
         ResetBuffer();
+
+        inputData = new Vector2[inputMax];
+        inputIndex = 0;
+        inputBuffer = new ComputeBuffer(inputMax, Marshal.SizeOf(typeof(Vector2)));
 
         var ren = GetComponentsInChildren<Renderer>();
         if (ren != null)
@@ -187,6 +198,40 @@ public class ReactionDiffusion : MonoBehaviour {
         cs.Dispatch(kernelDraw, Mathf.CeilToInt((float)texWidth / THREAD_NUM_X), Mathf.CeilToInt((float)texHeight / THREAD_NUM_X), 1);
     }
 
+    void AddSeedBuffer()
+    {
+        if(inputIndex > 0)
+        {
+            inputBuffer.SetData(inputData);
+            cs.SetInt("_InputNum", inputIndex);
+            cs.SetInt("_TexWidth", texWidth);
+            cs.SetInt("_TexHeight", texHeight);
+            cs.SetInt("_SeedSize", seedSize);
+            cs.SetBuffer(kernelAddSeed, "_InputBufferRead", inputBuffer);
+            cs.SetBuffer(kernelAddSeed, "_BufferWrite", buffers[0]);    // update前なので0
+            cs.Dispatch(kernelAddSeed, Mathf.CeilToInt((float)inputIndex / (float)THREAD_NUM_X), 1, 1);
+            inputIndex = 0;
+        }
+    }
+
+    void AddSeed(int x, int y)
+    {
+        if(inputIndex < inputMax)
+        {
+            inputData[inputIndex].x = x;
+            inputData[inputIndex].y = y;
+            inputIndex++;
+        }
+    }
+
+    void AddRandomSeed(int num)
+    {
+        for(int i = 0; i < num; i++)
+        {
+            AddSeed(Random.Range(0, texWidth), Random.Range(0, texHeight));
+        }
+    }
+
     void SwapBuffer()
     {
         ComputeBuffer temp = buffers[0];
@@ -214,6 +259,14 @@ public class ReactionDiffusion : MonoBehaviour {
             ResetBuffer();
         }
 
+        // 追加
+        if (Input.GetKeyDown(KeyCode.A))
+        {
+            AddRandomSeed(seedNum);
+        }
+
+        AddSeedBuffer();
+
         for (int i = 0; i < speed; i++)
         {
             UpdateBuffer();
@@ -233,6 +286,11 @@ public class ReactionDiffusion : MonoBehaviour {
                 buffers[i].Release();
                 buffers[i] = null;
             }
+        }
+        if(inputBuffer != null)
+        {
+            inputBuffer.Release();
+            inputBuffer = null;
         }
     }
 }

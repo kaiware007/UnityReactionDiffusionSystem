@@ -27,7 +27,8 @@
 		_EdgeLength("Edge length", Range(2,50)) = 5
 	}
 	SubShader {
-		Tags { "RenderType"="Opaque" }
+		//Tags { "RenderType"="Opaque" }
+		Tags{ "Queue" = "Transparent" "RenderType" = "Transparent" }
 		LOD 200
 		
 		CGPROGRAM
@@ -35,7 +36,7 @@
 		//#pragma surface surf Standard fullforwardshadows vertex:disp tessellate:tessDistance 
 		//#pragma surface surf Standard vertex:dispNone tessellate:tessEdge tessphong:_Phong nolightmap
 		//#pragma surface surf Standard fullforwardshadows vertex:disp tessellate:tessEdge
-		#pragma surface surf Standard vertex:disp tessellate:tessDistance tessphong:_Phong
+		#pragma surface surf Standard addshadow vertex:disp tessellate:tessDistance tessphong:_Phong alpha:blend
 
 		//#pragma target 3.0
 		#pragma target 4.6
@@ -107,6 +108,7 @@
 			half p = smoothstep(_Threshold, _Threshold + _Fading, v0);
 
 			o.Albedo = lerp(_Color0.rgb, _Color1.rgb, p);
+			o.Alpha = lerp(_Color0.a, _Color1.a, p);
 			o.Smoothness = lerp(_Smoothness0, _Smoothness1, p);
 			o.Metallic = lerp(_Metallic0, _Metallic1, p);
 			o.Normal = normalize(float3(v1 - v2, v3 - v4, 1 - _NormalStrength));
