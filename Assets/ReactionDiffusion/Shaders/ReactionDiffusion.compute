@@ -17,6 +17,10 @@ float _DA;
 float _DB;
 float _Feed;
 float _K;
+float _FeedMin;
+float _FeedMax;
+float _KMin;
+float _KMax;
 float _DT;
 
 float4 _TopColor;
@@ -25,6 +29,8 @@ float4 _BottomColor;
 int _SeedSize;
 int _InputNum;
 
+bool _IsFeedMap;
+
 StructuredBuffer<RDData> _BufferRead;
 RWStructuredBuffer<RDData> _BufferWrite;
 StructuredBuffer<float2> _InputBufferRead;
@@ -32,6 +38,33 @@ StructuredBuffer<float2> _InputBufferRead;
 RWTexture2D<float4> _DistTex;	// 書き込み先テクスチャ
 RWTexture2D<float4> _HeightMap;	// ハイトマップ
 RWTexture2D<float4> _NormalMap;	// ノーマルマップ
+
+Texture2D<float4> _FeedMap;	// Feed/Killの値に影響を与える画像
+
+SamplerState _LinearRepeat;
+
+//static const int2 laplaceIndex[9] = {
+//	int2( -1, -1), int2(0, -1), int2(1, -1),
+//	int2(-1, 0), int2(0, 0), int2(1, 1),
+//	int2(-1, 1), int2(0, 1), int2(1, 1),
+//};
+static const int laplaceIndexX[9] = {
+	-1, 0, 1,
+	-1, 0, 1,
+	-1, 0, 1,
+};
+
+static const int laplaceIndexY[9] = {
+	-1, -1, -1,
+	0, 0, 0,
+	1, 1, 1,
+};
+
+static const float laplacePower[9] = {
+	0.05, 0.2, 0.05,
+	0.2, -1, 0.2,
+	0.05, 0.2, 0.05,
+};
 
 int GetIndex(int x, int y) {
 	x = (x < 0) ? x + _TexWidth : x;
@@ -50,20 +83,41 @@ int2 GetPosition(int idx) {
 	return pos;
 }
 
+float2 GetPositionNormal(uint3 id) {
+	int x = id.x;
+	int y = id.y;
+	x = (x < 0) ? x + _TexWidth : x;
+	x = (x >= _TexWidth) ? x - _TexWidth : x;
+
+	y = (y < 0) ? y + _TexHeight : y;
+	y = (y >= _TexHeight) ? y - _TexHeight : y;
+
+	float2 pos;
+	pos.x = x / (float)_TexWidth;
+	pos.y = y / (float)_TexHeight;
+	return pos;
+}
+
 float LaplaceA(int x, int y) {
 	float sumA = 0;
-	
-	sumA += _BufferRead[GetIndex(x, y)].a * -1;
 
-	sumA += _BufferRead[GetIndex(x - 1, y)].a * 0.2;
-	sumA += _BufferRead[GetIndex(x + 1, y)].a * 0.2;
-	sumA += _BufferRead[GetIndex(x, y - 1)].a * 0.2;
-	sumA += _BufferRead[GetIndex(x, y + 1)].a * 0.2;
+	for (int i = 0; i < 9; i++) {
+		int2 pos = int2(laplaceIndexX[i], laplaceIndexY[i]);
+		int idx = GetIndex(x + pos.x, y + pos.y);
+		sumA += _BufferRead[idx].a * laplacePower[i];
+	}
 
-	sumA += _BufferRead[GetIndex(x - 1, y - 1)].a * 0.05;
-	sumA += _BufferRead[GetIndex(x + 1, y - 1)].a * 0.05;
-	sumA += _BufferRead[GetIndex(x + 1, y + 1)].a * 0.05;
-	sumA += _BufferRead[GetIndex(x - 1, y + 1)].a * 0.05;
+	//sumA += _BufferRead[GetIndex(x, y)].a * -1;
+
+	//sumA += _BufferRead[GetIndex(x - 1, y)].a * 0.2;
+	//sumA += _BufferRead[GetIndex(x + 1, y)].a * 0.2;
+	//sumA += _BufferRead[GetIndex(x, y - 1)].a * 0.2;
+	//sumA += _BufferRead[GetIndex(x, y + 1)].a * 0.2;
+
+	//sumA += _BufferRead[GetIndex(x - 1, y - 1)].a * 0.05;
+	//sumA += _BufferRead[GetIndex(x + 1, y - 1)].a * 0.05;
+	//sumA += _BufferRead[GetIndex(x + 1, y + 1)].a * 0.05;
+	//sumA += _BufferRead[GetIndex(x - 1, y + 1)].a * 0.05;
 
 	return sumA;
 }
@@ -71,17 +125,24 @@ float LaplaceA(int x, int y) {
 float LaplaceB(int x, int y) {
 	float sumB = 0;
 
-	sumB += _BufferRead[GetIndex(x, y)].b * -1;
+	for (int i = 0; i < 9; i++) {
+		//int2 pos = laplaceIndex[i];
+		int2 pos = int2(laplaceIndexX[i], laplaceIndexY[i]);
+		int idx = GetIndex(x + pos.x, y + pos.y);
+		sumB += _BufferRead[idx].b * laplacePower[i];
+	}
 
-	sumB += _BufferRead[GetIndex(x - 1, y)].b * 0.2;
-	sumB += _BufferRead[GetIndex(x + 1, y)].b * 0.2;
-	sumB += _BufferRead[GetIndex(x, y - 1)].b * 0.2;
-	sumB += _BufferRead[GetIndex(x, y + 1)].b * 0.2;
+	//sumB += _BufferRead[GetIndex(x, y)].b * -1;
 
-	sumB += _BufferRead[GetIndex(x - 1, y - 1)].b * 0.05;
-	sumB += _BufferRead[GetIndex(x + 1, y - 1)].b * 0.05;
-	sumB += _BufferRead[GetIndex(x + 1, y + 1)].b * 0.05;
-	sumB += _BufferRead[GetIndex(x - 1, y + 1)].b * 0.05;
+	//sumB += _BufferRead[GetIndex(x - 1, y)].b * 0.2;
+	//sumB += _BufferRead[GetIndex(x + 1, y)].b * 0.2;
+	//sumB += _BufferRead[GetIndex(x, y - 1)].b * 0.2;
+	//sumB += _BufferRead[GetIndex(x, y + 1)].b * 0.2;
+
+	//sumB += _BufferRead[GetIndex(x - 1, y - 1)].b * 0.05;
+	//sumB += _BufferRead[GetIndex(x + 1, y - 1)].b * 0.05;
+	//sumB += _BufferRead[GetIndex(x + 1, y + 1)].b * 0.05;
+	//sumB += _BufferRead[GetIndex(x - 1, y + 1)].b * 0.05;
 
 	return sumB;
 }
@@ -144,9 +205,29 @@ void Update(uint3 id : SV_DispatchThreadID)
 	float a = _BufferRead[idx].a;
 	float b = _BufferRead[idx].b;
 	float abb = a * b * b;
-	_BufferWrite[idx].a = clamp(a + (_DA * LaplaceA(id.x, id.y) - abb + _Feed * (1.0 - a)), 0, 1);
-	_BufferWrite[idx].b = clamp(b + (_DB * LaplaceB(id.x, id.y) + abb - (_K + _Feed) * b), 0, 1);
+	float f, k;
 
+	if (_IsFeedMap) {
+		float2 pos = GetPositionNormal(id);
+		float4 t = _FeedMap.SampleLevel(_LinearRepeat, pos, 0);
+		f = lerp(_FeedMin, _FeedMax, t.r);
+		k = lerp(_KMin, _KMax, t.g);
+	}
+	else {
+		// 通常
+		f = _Feed;
+		k = _K;
+	}
+	//_BufferWrite[idx].a = clamp(a + (_DA * LaplaceA(id.x, id.y) - abb + _Feed * (1.0 - a)), 0, 1);
+	//_BufferWrite[idx].b = clamp(b + (_DB * LaplaceB(id.x, id.y) + abb - (_K + _Feed) * b), 0, 1);
+
+	// 座標でf/kの値を変えてみるテスト
+	//float2 pos = GetPositionNormal(id);
+	//float4 t = _FeedMap.SampleLevel(_LinearRepeat, pos, 0);
+	//float f = lerp(_FeedMin, _FeedMax, t.r);
+	//float k = lerp(_KMin, _KMax, t.g);
+	_BufferWrite[idx].a = clamp(a + (_DA * LaplaceA(id.x, id.y) - abb + f * (1.0 - a)), 0, 1);
+	_BufferWrite[idx].b = clamp(b + (_DB * LaplaceB(id.x, id.y) + abb - (k + f) * b), 0, 1);
 }
 
 // テクスチャに描画

@@ -1,6 +1,7 @@
 # Reaction Diffusion System for Unity
 
 ![screenshot](Image/image01.png)
+![screenshot](Image/image02.png)
 
 ### System Requirements
 - Unity 5.6f3
